@@ -24,6 +24,7 @@ if not UIS.TouchEnabled then return end
 local player = Players.LocalPlayer
 local backpack = player:WaitForChild("Backpack")
 
+local MAX_SLOTS = 5
 local SLOT_SIZE = 52
 local GAP = 6
 local HOLD_TIME = 0.25
