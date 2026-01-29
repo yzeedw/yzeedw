@@ -1,8 +1,9 @@
+-- Open Source the script is explained for learning
 local Alurt = loadstring(game:HttpGet("https://pastebin.com/raw/FaTrxyKZ"))()
 
 -- First notification
 local notif1 = Alurt.CreateNode({
-    Title = "Made by mortalexploits",
+    Title = "by mortalexploits on yt",
     Content = "Inventory successfully loaded",
     Audio = "rbxassetid://17525305988",
     Length = 6,
@@ -374,7 +375,7 @@ function toolObjectMetatable:updateIcon()
 				label:Destroy()
 			end
 		else
-			-- No image - update label, remove icon if exists
+			-- no image update label remove icon if exists
 			if label then
 				label.Text = tool.Name
 			end
@@ -575,7 +576,7 @@ function inventoryHandler:addTool(tool, parent, position)
 	local holdTask = nil
 	
 	frame.InputBegan:Connect(function(input)
-		-- FIXED: Only allow drag initiation when panel is visible
+		-- FIXED: ah yeah fixed drag initiation when panel is visible
 		if input.UserInputType == Enum.UserInputType.Touch and panel.Visible and not dragState.isDragging then
 			dragState.holdStart = tick()
 			dragState.startPos = input.Position
@@ -727,7 +728,7 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 -- ===== PANEL VISIBILITY CHANGE HANDLER =====
--- FIXED: Clear drag state when panel is closed
+-- FIXED: yeah fixed some issues
 panel:GetPropertyChangedSignal("Visible"):Connect(function()
 	if not panel.Visible and dragState.isDragging then
 		clearDragState()
@@ -777,7 +778,7 @@ toggle.InputEnded:Connect(function(input)
 	end
 end)
 
--- ===== RESPAWN HANDLER =====
+-- ===== RESPAWN Stuff =====
 local charConnections = {}
 
 local function clearAllObjects()
