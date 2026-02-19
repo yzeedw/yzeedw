@@ -1,7 +1,12 @@
 -- Open Source the script is explained for learning
+if getgenv().MCInventoryLoaded or game.Players.LocalPlayer.PlayerGui:FindFirstChild("MCInventory") then
+    return
+end
+getgenv().MCInventoryLoaded = true
+
+-- notify
 local Alurt = loadstring(game:HttpGet("https://pastebin.com/raw/FaTrxyKZ"))()
 
--- First notification
 local notif1 = Alurt.CreateNode({
     Title = "by mortalexploits on yt",
     Content = "Inventory successfully loaded",
@@ -10,9 +15,17 @@ local notif1 = Alurt.CreateNode({
     Image = "rbxassetid://17616650704",
     BarColor = Color3.fromRGB(255, 75, 75)
 })
+local notif1 = Alurt.CreateNode({
+    Title = "Updated (fixed) ",
+    Content = "20/2 ",
+    Audio = "rbxassetid://17525305988",
+    Length = 3,
+    Image = "rbxassetid://17616650704",
+    BarColor = Color3.fromRGB(255, 75, 75)
+})
 
 -- Custom Inventory
-loadstring(game:HttpGet("https://pastebin.com/raw/AVDYmgJ6"))()
+loadstring(game:HttpGet("https://pastebin.com/raw/nfH5bCFE"))()
 
 local UIS = game:GetService("UserInputService")
 local Players = game:GetService("Players")
@@ -26,9 +39,12 @@ local player = Players.LocalPlayer
 local backpack = player:WaitForChild("Backpack")
 
 local MAX_SLOTS = 5
-local SLOT_SIZE = 52
+local SLOT_SIZE = 55
 local GAP = 6
 local HOLD_TIME = 0.25
+
+-- ===== SAVE SYSTEM FOR TOOL POSITIONS =====
+local savedPositions = {}
 
 -- ===== DRAG SYSTEM STATE =====
 local dragState = {
@@ -66,7 +82,7 @@ gui.Parent = player.PlayerGui
 -- ===== HOTBAR =====
 local hotbar = Instance.new("Frame")
 hotbar.AnchorPoint = Vector2.new(0.5,1)
-hotbar.Position = UDim2.new(0.5,0,1,-30)
+hotbar.Position = UDim2.new(0.5,0,1,-20)
 hotbar.BackgroundTransparency = 1
 hotbar.Parent = gui
 
@@ -84,7 +100,7 @@ Instance.new("UICorner", toggle).CornerRadius = UDim.new(0,8)
 local panel = Instance.new("Frame")
 panel.Size = UDim2.fromOffset(260,220)
 panel.AnchorPoint = Vector2.new(0.5, 1)
-panel.Position = UDim2.new(0.5, 0, 1, -90)
+panel.Position = UDim2.new(0.5, 0, 1, -80)
 panel.BackgroundColor3 = Color3.fromRGB(35,35,35)
 panel.BackgroundTransparency = 0.1
 panel.Visible = false
@@ -131,7 +147,6 @@ local function getToolObjectFromFrame(frame)
 	return nil
 end
 
--- Consolidated function to remove tool from parent
 local function removeToolFromParent(obj)
 	if obj.Parent == "HotBar" then
 		inventoryHandler.OBJECTS.HotBar[obj.Position] = nil
@@ -140,7 +155,6 @@ local function removeToolFromParent(obj)
 	end
 end
 
--- Consolidated function to add tool to parent
 local function addToolToParent(obj)
 	if obj.Parent == "HotBar" then
 		inventoryHandler.OBJECTS.HotBar[obj.Position] = obj
@@ -149,7 +163,6 @@ local function addToolToParent(obj)
 	end
 end
 
--- Consolidated function to update stroke appearance
 local function updateFrameStroke(frame, isEquipped)
 	local stroke = frame:FindFirstChild("UIStroke")
 	local glow = frame:FindFirstChild("glow")
@@ -159,38 +172,24 @@ local function updateFrameStroke(frame, isEquipped)
 			stroke.Color = Color3.fromRGB(255,255,255)
 			stroke.Thickness = 3
 		end
-		frame.BackgroundTransparency = 0.05
+		frame.BackgroundTransparency = 0.3
+		if glow then
+			local gStroke = glow:FindFirstChild("UIStroke")
+			if gStroke then
+				gStroke.Transparency = 0.3
+			end
+		end
 	else
 		if stroke then
 			stroke.Color = Color3.fromRGB(180,180,180)
 			stroke.Thickness = 2
 		end
-		frame.BackgroundTransparency = 0.2
-	end
-end
-
--- Consolidated function to manage glow effect
-local function updateGlowEffect(obj, isEquipped)
-	local glow = obj.Frame:FindFirstChild("glow")
-	if not glow then return end
-	
-	local gStroke = glow:FindFirstChild("UIStroke")
-	if not gStroke then return end
-	
-	if isEquipped then
-		if not obj.glowTween then
-			obj.glowTween = TweenService:Create(
-				gStroke,
-				TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-				{Transparency = 0.2}
-			)
-			obj.glowTween:Play()
-		end
-	else
-		gStroke.Transparency = 1
-		if obj.glowTween then
-			obj.glowTween:Cancel()
-			obj.glowTween = nil
+		frame.BackgroundTransparency = 0.55
+		if glow then
+			local gStroke = glow:FindFirstChild("UIStroke")
+			if gStroke then
+				gStroke.Transparency = 1
+			end
 		end
 	end
 end
@@ -201,7 +200,6 @@ local function updateToolFrame(obj)
 		obj.Frame.Name = tostring(obj.Position)
 		obj.Frame.Position = UDim2.fromOffset((obj.Position-1)*(SLOT_SIZE+GAP),0)
 		
-		-- Add number label if missing
 		if not obj.Frame:FindFirstChild("toolNumber") then
 			local numLabel = Instance.new("TextLabel")
 			numLabel.Size = UDim2.new(0.343,0,0.288,0)
@@ -227,26 +225,26 @@ local function updateToolFrame(obj)
 end
 
 local function reorganizeHotbar()
-	-- Collect all hotbar tools
 	local hotbarTools = {}
 	for pos, toolObj in pairs(inventoryHandler.OBJECTS.HotBar) do
 		table.insert(hotbarTools, {pos = pos, obj = toolObj})
 	end
 	
-	-- Sort by position
 	table.sort(hotbarTools, function(a, b) return a.pos < b.pos end)
 	
-	-- Clear hotbar
 	inventoryHandler.OBJECTS.HotBar = {}
 	
-	-- Reassign positions sequentially (1, 2, 3, etc.)
 	for i, toolData in ipairs(hotbarTools) do
 		local toolObj = toolData.obj
 		toolObj.Position = i
 		inventoryHandler.OBJECTS.HotBar[i] = toolObj
-		
-		-- Update frame
 		updateToolFrame(toolObj)
+		
+		-- Update saved position
+		savedPositions[toolObj.Tool.Name] = {
+			Parent = "HotBar",
+			Position = i
+		}
 	end
 	
 	inventoryHandler:updateHotbarSize()
@@ -257,20 +255,19 @@ local function moveToolToSlot(obj, targetParent, targetPos)
 	
 	local oldParent = obj.Parent
 	
-	-- Remove from old position
 	removeToolFromParent(obj)
 	
-	-- Update object data
 	obj.Parent = targetParent
 	obj.Position = targetPos
 	
-	-- Add to new position
 	addToolToParent(obj)
-	
-	-- Update visual frame
 	updateToolFrame(obj)
 	
-	-- If moved from hotbar, reorganize to close gaps
+	savedPositions[obj.Tool.Name] = {
+		Parent = targetParent,
+		Position = targetPos
+	}
+	
 	if oldParent == "HotBar" and targetParent == "Inventory" then
 		reorganizeHotbar()
 	else
@@ -283,35 +280,38 @@ local function swapToolPositions(obj1, obj2)
 	
 	local parent1, parent2 = obj1.Parent, obj2.Parent
 	local pos1, pos2 = obj1.Position, obj2.Position
-	local name1, name2 = obj1.Name, obj2.Name
 	
-	-- Remove from old positions
 	removeToolFromParent(obj1)
 	removeToolFromParent(obj2)
 	
-	-- Swap data
 	obj1.Parent, obj1.Position = parent2, pos2
 	obj2.Parent, obj2.Position = parent1, pos1
 	
-	-- Add back to new positions
 	addToolToParent(obj1)
 	addToolToParent(obj2)
 	
-	-- Update visual frames
 	updateToolFrame(obj1)
 	updateToolFrame(obj2)
+	
+	savedPositions[obj1.Tool.Name] = {
+		Parent = obj1.Parent,
+		Position = obj1.Position
+	}
+	savedPositions[obj2.Tool.Name] = {
+		Parent = obj2.Parent,
+		Position = obj2.Position
+	}
 	
 	inventoryHandler:updateHotbarSize()
 end
 
--- Function to clear drag state completely
 local function clearDragState()
 	if dragState.dragClone then
 		dragState.dragClone:Destroy()
 	end
 	
 	if dragState.dragFrame then
-		dragState.dragFrame.BackgroundTransparency = 0.2
+		dragState.dragFrame.BackgroundTransparency = 0.55
 	end
 	
 	dragState.isDragging = false
@@ -349,7 +349,6 @@ function toolObjectMetatable:DisconnectAll()
 
 	removeToolFromParent(self)
 	
-	-- If tool was in hotbar, reorganize to fill the gap
 	if wasInHotbar then
 		reorganizeHotbar()
 	else
@@ -367,7 +366,6 @@ function toolObjectMetatable:updateIcon()
 		local label = self.Frame:FindFirstChild("toolName")
 		
 		if hasImage then
-			-- Has image - update icon, remove label if exists
 			if icon then 
 				icon.Image = textureId 
 			end
@@ -375,7 +373,6 @@ function toolObjectMetatable:updateIcon()
 				label:Destroy()
 			end
 		else
-			-- no image update label remove icon if exists
 			if label then
 				label.Text = tool.Name
 			end
@@ -390,21 +387,14 @@ function toolObjectMetatable:updateEquipped()
 	local isEquipped = self:isEquipped() and self.Tool.Enabled
 	
 	if isEquipped then
-		-- Clear previous equipped item
 		if inventoryHandler.currentlyEquipped and inventoryHandler.currentlyEquipped ~= self.Frame then
 			updateFrameStroke(inventoryHandler.currentlyEquipped, false)
-			local oldObj = getToolObjectFromFrame(inventoryHandler.currentlyEquipped)
-			if oldObj then
-				updateGlowEffect(oldObj, false)
-			end
 		end
 
 		inventoryHandler.currentlyEquipped = self.Frame
 		updateFrameStroke(self.Frame, true)
-		updateGlowEffect(self, true)
 	else
 		updateFrameStroke(self.Frame, false)
-		updateGlowEffect(self, false)
 		
 		if inventoryHandler.currentlyEquipped == self.Frame then
 			inventoryHandler.currentlyEquipped = nil
@@ -414,15 +404,17 @@ end
 
 -- ===== INVENTORY HANDLER METHODS =====
 function inventoryHandler:getObjectFromTool(tool)
-	local function searchToolObject(toolParent)
-		for _, toolObject in pairs(toolParent) do
-			if toolObject.Tool == tool then 
-				return toolObject 
-			end
+	for _, toolObject in pairs(self.OBJECTS.HotBar) do
+		if toolObject.Tool == tool then 
+			return toolObject 
 		end
 	end
 	
-	return searchToolObject(self.OBJECTS.HotBar) or searchToolObject(self.OBJECTS.Inventory)
+	for _, toolObject in pairs(self.OBJECTS.Inventory) do
+		if toolObject.Tool == tool then 
+			return toolObject 
+		end
+	end
 end
 
 function inventoryHandler:updateHotbarSize()
@@ -439,24 +431,48 @@ end
 
 function inventoryHandler:addTool(tool, parent, position)
 	tool:SetAttribute("position", nil)
+	
+	-- FIXED: Check for duplicates before adding
+	if self:getObjectFromTool(tool) then
+		return -- Tool already exists, don't add duplicate
+	end
+	
+	-- Check if tool has a saved position
+	local savedData = savedPositions[tool.Name]
+	if savedData then
+		parent = savedData.Parent
+		position = savedData.Position
+		
+		-- FIXED: If saved position is occupied, find next available slot
+		if parent == "HotBar" and self.OBJECTS.HotBar[position] then
+			position = nil -- Will find next available below
+		end
+	end
+	
 	if position == -1 then
 		parent = "Inventory"
 		position = nil
 	end
 
 	if not position and parent == "HotBar" then
+		-- FIXED: Find first available slot sequentially (1, 2, 3...)
 		for index = 1, self.slotAmount do
 			if self.OBJECTS.HotBar[index] == nil then
 				position = index
 				break
 			end
 		end
+		
+		-- If no slots available, move to inventory
+		if not position then
+			parent = "Inventory"
+		end
 	end
 
 	local frame = Instance.new("TextButton")
 	frame.Size = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE)
 	frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	frame.BackgroundTransparency = 0.2
+	frame.BackgroundTransparency = 0.55
 	frame.Text = ""
 	frame.Name = parent == "HotBar" and tostring(position) or tool.Name
 	
@@ -487,20 +503,19 @@ function inventoryHandler:addTool(tool, parent, position)
 	gStroke.Transparency = 1
 	gStroke.Parent = glow
 
-	-- Check if tool has an image
 	local hasImage = tool.TextureId and tool.TextureId ~= ""
 	
 	if hasImage then
-		-- Tool has image - only show icon, no text
 		local icon = Instance.new("ImageLabel")
-		icon.Size = UDim2.fromScale(0.8,0.8)
-		icon.Position = UDim2.fromScale(0.1,0.1)
+		icon.Size = UDim2.fromScale(0.85,0.85)
+		icon.Position = UDim2.fromScale(0.075,0.075)
 		icon.BackgroundTransparency = 1
+		icon.ImageTransparency = 0
+		icon.ScaleType = Enum.ScaleType.Fit
 		icon.Name = "toolIcon"
 		icon.Image = tool.TextureId
 		icon.Parent = frame
 	else
-		-- Tool has no image - show centered text only
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1,1)
 		label.Position = UDim2.fromScale(0,0)
@@ -537,7 +552,6 @@ function inventoryHandler:addTool(tool, parent, position)
 	object.Position = position
 	object.Name = tool.Name
 	
-	-- Store in correct location
 	addToolToParent(object)
 
 	local function manageTool()
@@ -576,7 +590,6 @@ function inventoryHandler:addTool(tool, parent, position)
 	local holdTask = nil
 	
 	frame.InputBegan:Connect(function(input)
-		-- FIXED: ah yeah fixed drag initiation when panel is visible
 		if input.UserInputType == Enum.UserInputType.Touch and panel.Visible and not dragState.isDragging then
 			dragState.holdStart = tick()
 			dragState.startPos = input.Position
@@ -584,27 +597,22 @@ function inventoryHandler:addTool(tool, parent, position)
 			dragState.dragFrame = frame
 			dragState.touchId = input
 			
-			-- Cancel any previous hold task
 			if holdTask then
 				task.cancel(holdTask)
 			end
 			
 			holdTask = task.delay(HOLD_TIME, function()
-				-- FIXED: Double-check panel is still visible before starting drag
 				if dragState.dragObject == object and not dragState.isDragging and panel.Visible then
 					dragState.isDragging = true
 					
-					-- Create drag clone
 					local clone = frame:Clone()
 					clone.Parent = gui
 					clone.ZIndex = 100
 					clone.Size = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE)
 					dragState.dragClone = clone
 					
-					-- Make original semi-transparent
-					frame.BackgroundTransparency = 0.6
+					frame.BackgroundTransparency = 0.75
 					
-					-- Position clone at touch
 					local framePos = frame.AbsolutePosition
 					clone.Position = UDim2.fromOffset(framePos.X, framePos.Y)
 				end
@@ -614,12 +622,10 @@ function inventoryHandler:addTool(tool, parent, position)
 	
 	frame.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch then
-			-- Cancel hold task if touch ended before drag started
 			if holdTask and not dragState.isDragging then
 				task.cancel(holdTask)
 				holdTask = nil
 				
-				-- Reset drag state
 				if dragState.dragObject == object then
 					dragState.dragObject = nil
 					dragState.dragFrame = nil
@@ -654,7 +660,6 @@ end
 
 -- ===== GLOBAL DRAG INPUT HANDLING =====
 UIS.InputChanged:Connect(function(input)
-	-- FIXED: Only process drag movement if panel is visible
 	if dragState.isDragging and input.UserInputType == Enum.UserInputType.Touch and panel.Visible then
 		dragState.inputPos = input.Position
 		
@@ -668,67 +673,52 @@ UIS.InputChanged:Connect(function(input)
 end)
 
 UIS.InputEnded:Connect(function(input)
-	-- FIXED: Only process drag end if we're actually dragging AND panel is visible
 	if input.UserInputType == Enum.UserInputType.Touch and dragState.isDragging and dragState.touchId == input and panel.Visible then
 		dragState.isDragging = false
 		
-		-- Find target frame
 		local targetFrame = getFrameAtPosition(input.Position)
 		local targetObject = targetFrame and getToolObjectFromFrame(targetFrame)
 		
 		if targetObject and targetObject ~= dragState.dragObject then
-			-- Swap positions
 			swapToolPositions(dragState.dragObject, targetObject)
 		elseif not targetObject then
-			-- Check if dropped on hotbar area
 			local hotbarPos = hotbar.AbsolutePosition
 			local dropX = input.Position.X
 			local dropY = input.Position.Y
 			
-			-- Expand hotbar detection area to include space for MAX_SLOTS
 			local expandedHotbarWidth = inventoryHandler.slotAmount * (SLOT_SIZE + GAP)
 			
 			if dropY >= hotbarPos.Y and dropY <= hotbarPos.Y + SLOT_SIZE and
 			   dropX >= hotbarPos.X and dropX <= hotbarPos.X + expandedHotbarWidth then
 				
-				-- Calculate which slot was clicked
 				local relX = dropX - hotbarPos.X
 				local slotIndex = math.floor(relX / (SLOT_SIZE + GAP)) + 1
 				
 				if slotIndex >= 1 and slotIndex <= inventoryHandler.slotAmount then
-					-- Check if slot is empty
 					if not inventoryHandler.OBJECTS.HotBar[slotIndex] then
-						-- Empty slot - just move there
 						moveToolToSlot(dragState.dragObject, "HotBar", slotIndex)
 					else
-						-- Occupied slot - swap with existing tool
 						local existingTool = inventoryHandler.OBJECTS.HotBar[slotIndex]
 						swapToolPositions(dragState.dragObject, existingTool)
 					end
 				end
-			-- Check if dropped on empty inventory panel space
 			elseif dragState.dragObject.Parent == "HotBar" then
 				local panelPos = panel.AbsolutePosition
 				local panelSize = panel.AbsoluteSize
 				
 				if dropX >= panelPos.X and dropX <= panelPos.X + panelSize.X and
 				   dropY >= panelPos.Y and dropY <= panelPos.Y + panelSize.Y then
-					-- Move from hotbar to inventory
 					moveToolToSlot(dragState.dragObject, "Inventory", nil)
 				end
 			end
 		end
 		
-		-- Cleanup
 		clearDragState()
 	elseif input.UserInputType == Enum.UserInputType.Touch and dragState.touchId == input then
-		-- FIXED: If touch ends but panel closed, clear drag state anyway
 		clearDragState()
 	end
 end)
 
--- ===== PANEL VISIBILITY CHANGE HANDLER =====
--- FIXED: yeah fixed some issues
 panel:GetPropertyChangedSignal("Visible"):Connect(function()
 	if not panel.Visible and dragState.isDragging then
 		clearDragState()
@@ -778,7 +768,7 @@ toggle.InputEnded:Connect(function(input)
 	end
 end)
 
--- ===== RESPAWN Stuff =====
+-- ===== RESPAWN HANDLER =====
 local charConnections = {}
 
 local function clearAllObjects()
